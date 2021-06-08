@@ -1,38 +1,35 @@
-from sqlalchemy import create_engine
-import pandas as pd
 import os
+import pandas as pd
+from pandas.core.frame import DataFrame
+import funcoes.conexao as conectModel
+import arq.consulta as cons
 
-DIRDEFAULT = os.path.dirname(os.path.abspath(__file__))
 DIRARQ = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'arq')
-BANCODADOS = 'meubanco.db'
-strconexao = f'sqlite:///{os.path.join(DIRDEFAULT, BANCODADOS)}'
 
-engine = create_engine(strconexao, echo=True)
-engine.connect()
-
+# Leitura do meu arquivo CSV
 pulls = pd.read_csv(os.path.join(DIRARQ, 'pulls.csv'))
-pulls.to_sql('pulls', engine)
+
+# Conexão com o meu banco de dados SQLITE:
+con = conectModel.conexaoSQLITE()
 
 
-selecionados = pd.read_sql_query(
-    '''
-    select
-        a.user_login,
-        a.created_at,
-        a.updated_at,
-        (julianday(date('now')) - julianday(a.updated_at)) as diferenca
-    from pulls a
-    where
-        a.user_login in (
-            'tobiasdiez',
-            'koppor',
-            'matthiasgeiger',
-            'Siedlerchr',
-            'simonharrer',
-            'mortenalver',
-            'oscargus'
-    )order by user_login, a.updated_at
-    ''', engine
-)
+try:
+    # Criando tabela pulls dentro do meu banco SQLITE
+    pulls.to_sql('pulls', con, if_exists='fail')
+except ValueError as erro:
+    if str(erro) == "Table 'pulls' already exists.":
+        print('A tabela "Pulls já esta criada no banco"')
+        print('Continue....')
+    else:
+        print(f'Mensagem de erro: {erro}')
 
-print(selecionados)
+# Lendo uma consulta que esta dentro do pacote de "arq".consulta
+dataFramePulls = pd.read_sql_query(cons.consultauser_login(), con)
+
+for indice, linha in dataFramePulls.iterrows():
+    print(
+        ' user_login->', linha['user_login'],
+        ' created_at->', linha['created_at'],
+        ' updated_at->', linha['updated_at'],
+        ' diferenca->', linha['diferenca']
+    )
